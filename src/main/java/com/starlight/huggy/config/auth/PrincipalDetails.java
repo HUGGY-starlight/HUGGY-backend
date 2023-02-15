@@ -9,22 +9,18 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
-
-import lombok.Data;
-
-// Authentication 객체에 저장할 수 있는 유일한 타입
 public class PrincipalDetails implements UserDetails, OAuth2User{
 
 	private static final long serialVersionUID = 1L;
 	private User user;
 	private Map<String, Object> attributes;
 
-	// 일반 시큐리티 로그인시 사용
+	// 일반 시큐리티 로그인
 	public PrincipalDetails(User user) {
 		this.user = user;
 	}
 	
-	// OAuth2.0 로그인시 사용
+	// OAuth2.0 로그인
 	public PrincipalDetails(User user, Map<String, Object> attributes) {
 		this.user = user;
 		this.attributes = attributes;
@@ -63,12 +59,17 @@ public class PrincipalDetails implements UserDetails, OAuth2User{
 	public boolean isEnabled() {
 		return true;
 	}
-	
-	@Override
+
+	@Override // User 권한
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		Collection<GrantedAuthority> collet = new ArrayList<GrantedAuthority>();
-		collet.add(()->{ return user.getRole();});
-		return collet;
+		Collection<GrantedAuthority> collect = new ArrayList<>();
+		collect.add(new GrantedAuthority() {
+			@Override
+			public String getAuthority() {
+				return user.getRole();
+			}
+		});
+		return collect;
 	}
 
 	// 리소스 서버로 부터 받는 회원정보
@@ -80,7 +81,7 @@ public class PrincipalDetails implements UserDetails, OAuth2User{
 	// User의 PrimaryKey
 	@Override
 	public String getName() {
-		return user.getId()+"";
+		return user.getMemberId()+"";
 	}
 	
 }

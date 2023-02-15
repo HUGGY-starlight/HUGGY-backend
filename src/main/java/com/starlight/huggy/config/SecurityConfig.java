@@ -4,6 +4,8 @@ import com.starlight.huggy.config.oauth.PrincipalOauth2UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -12,8 +14,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 
-@Configuration // IoC 빈(bean)을 등록
-@EnableWebSecurity // 필터 체인 관리 시작 어노테이션
+@Configuration
+@EnableWebSecurity // 필터 체인
+@EnableMethodSecurity(securedEnabled = true)//@secured("ROLE_MANAGER") , @PreAuthorize("hasRole(ROLE_MANAGER)")
 public class SecurityConfig {
 
 	@Autowired
@@ -25,16 +28,17 @@ public class SecurityConfig {
 		http.csrf()
 				.disable()
 				.authorizeHttpRequests()
-
-				.requestMatchers("/user/**")
+				.antMatchers("/user/**")
 				.authenticated()
-				.requestMatchers("/login/**")
-				.anonymous()
+				.antMatchers("/login/**")
+				.permitAll()
 				.anyRequest().permitAll()
 				.and()
 				.formLogin()
-				//.loginPage("/login")
-
+				.loginProcessingUrl("/login")
+				.defaultSuccessUrl("/")
+				.and()
+				.oauth2Login()
 				.and()
 				.httpBasic()
 				.and()
@@ -49,7 +53,7 @@ public class SecurityConfig {
 	}
 	@Bean
 	public WebSecurityCustomizer webSecurityCustomizer() {
-		return (web) -> web.ignoring().requestMatchers("/images/**", "/js/**", "/webjars/**");
+		return (web) -> web.ignoring().antMatchers("/images/**", "/js/**", "/webjars/**");
 	}
 	@Bean
 	public BCryptPasswordEncoder encodePassword() {
