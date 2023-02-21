@@ -31,9 +31,9 @@ public class User {
 	private String username;
 	private String role;
 
-	// OAuth를 위해 구성한 추가 필드 2개
-	private String provider;
-	private String providerId;
+	// OAuth 로그인한 사용자
+	private String provider; //"GOOGLE", "KAKAO"
+	private String providerId; // {google_id}
 	@CreationTimestamp
 	private Timestamp createDate;
 }
