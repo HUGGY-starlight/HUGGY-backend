@@ -73,7 +73,7 @@ public class SecurityConfig {
 		.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
 				.and()
 		.addFilter(corsFilter) //@CrossOrgin(인증x) 시큐리티에 인증 등록
-		.formLogin().disable()
+		.formLogin().disable()//.loginPage("/login").loginProcessingUrl("/doLogin")
 		.httpBasic().disable()
 
 		.addFilter(new JwtBasicAuthenticationFilter())
@@ -81,9 +81,10 @@ public class SecurityConfig {
 				AuthenticationConfiguration.class)), tokenProvider, userRepository))
 		
 		.authorizeRequests()
-					.antMatchers("/user/**").access("hasRole('ROLE_USER')")
-					.antMatchers("/admin/**").access("hasRole('ROLE_ADMIN')")
-					//.anyRequest().permitAll()
+				.antMatchers("/api/v1/home").permitAll()
+					.antMatchers("/api/v1/user/**").access("hasRole('ROLE_USER')")
+					//.antMatchers("/api/v1/admin/**").access("hasRole('ROLE_ADMIN')")
+					//.anyRequest().denyAll()
 		.and()
 		.oauth2Login().userInfoEndpoint()
         .userService(customOAuth2UserService)
@@ -91,7 +92,7 @@ public class SecurityConfig {
 		.successHandler((request, response, authentication) -> {
 			String token = tokenProvider.create(authentication);
 			response.addHeader("Authorization", "Bearer " +  token);
-			String targetUrl = "/auth/success";
+			String targetUrl = "/api/v1/auth/success";
 			RequestDispatcher dis = request.getRequestDispatcher(targetUrl);
 			dis.forward(request, response);
 		})
