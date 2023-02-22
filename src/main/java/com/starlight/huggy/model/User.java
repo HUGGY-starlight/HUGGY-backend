@@ -1,39 +1,52 @@
 package com.starlight.huggy.model;
 
 
-import java.sql.Timestamp;
-
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
+import javax.validation.constraints.Email;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
-// ORM - Object Relation Mapping
 
-@Builder
 @Data
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(columnNames = "email")
+})
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
 public class User {
-	@Id // primary key
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private int memberId;
-	private String email;
-	private String password;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-	private String username;
-	private String role;
+    @Column(nullable = false)
+    private String name;
 
-	// OAuth 로그인한 사용자
-	private String provider; //"GOOGLE", "KAKAO"
-	private String providerId; // {google_id}
-	@CreationTimestamp
-	private Timestamp createDate;
+    @Email
+    @Column(nullable = false)
+    private String email;
+
+    private String imageUrl;
+
+    @Column(nullable = false)
+    private Boolean emailVerified = false;
+
+    @JsonIgnore
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+    
+    @Enumerated(EnumType.STRING)
+    private AuthProvider provider;
+
+    private String providerId;
+
+    // Getters and Setters (Omitted for brevity)
 }

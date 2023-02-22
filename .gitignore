@@ -1,3 +1,5 @@
+**/config/secret/**
+
 HELP.md
 .gradle
 build/

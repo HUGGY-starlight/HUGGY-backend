@@ -1,80 +1,152 @@
 package com.starlight.huggy.config;
 
-import com.starlight.huggy.config.jwt.JwtAuthenticationFilter;
-import com.starlight.huggy.config.oauth.PrincipalOauth2UserService;
-import com.starlight.huggy.filter.JwtTokenFilter;
+import com.starlight.huggy.repository.UserRepository;
+import com.starlight.huggy.security.CustomUserDetailsService;
+import com.starlight.huggy.security.jwt.JwtBasicAuthenticationFilter;
+import com.starlight.huggy.security.jwt.JwtCommonAuthorizationFilter;
+import com.starlight.huggy.security.jwt.JwtTokenProvider;
+import com.starlight.huggy.security.oauth2.CustomOAuth2UserService;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.web.filter.CorsFilter;
 
-
 @Configuration
-@EnableWebSecurity // 필터 체인
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(
+        securedEnabled = true,
+        jsr250Enabled = true,
+        prePostEnabled = true)
 @RequiredArgsConstructor
-@EnableMethodSecurity(securedEnabled = true)
-@EnableGlobalMethodSecurity(prePostEnabled = true)
-
 public class SecurityConfig {
+
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
+
+    @Autowired
+    private CustomOAuth2UserService customOAuth2UserService;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private JwtTokenProvider tokenProvider;
+
 	private final CorsFilter corsFilter;
-	@Autowired
-	private PrincipalOauth2UserService principalOauth2UserService;
-
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http
-				.csrf().disable()
-				.sessionManagement()
-				.sessionCreationPolicy(SessionCreationPolicy.STATELESS) //세션 사용 x
-				.and()
-				.addFilter(corsFilter) //@CrossOrgin(인증x) 시큐리티에 인증 등록
-				/*.addFilterBefore(
-						new JwtTokenFilter(),
-						UsernamePasswordAuthenticationFilter.class)userService,secretKey*/
-				//.formLogin().loginProcessingUrl("/login").defaultSuccessUrl("/")
-				.formLogin().disable()
-				.httpBasic().disable() // ID + PW 인증방식
-				.addFilter(new JwtAuthenticationFilter(authenticationManager(http.getSharedObject(AuthenticationConfiguration.class))/**/))
-				.authorizeRequests()
-				.antMatchers("/api/v1/user/**").authenticated()
-				.antMatchers("/api/v1/user/join/**","/login/**").permitAll()
-				.and()
-				.oauth2Login().userInfoEndpoint()//구글 로그인 완료후, 후처리
-				.userService(principalOauth2UserService);
-
-//		http.headers().frameOptions().sameOrigin();
-		return http.build();
-
+	public BCryptPasswordEncoder encodePWD() {
+		return new BCryptPasswordEncoder();
 	}
 
 	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http.csrf().disable() //csrf 토큰
+		.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+				.and()
+		.addFilter(corsFilter) //@CrossOrgin(인증x) 시큐리티에 인증 등록
+		.formLogin().disable()
+		.httpBasic().disable()
+
+		.addFilter(new JwtBasicAuthenticationFilter())
+		.addFilter(new JwtCommonAuthorizationFilter(authenticationManager(http.getSharedObject(
+				AuthenticationConfiguration.class)), tokenProvider, userRepository))
+		
+		.authorizeRequests()
+					.antMatchers("/user/**").access("hasRole('ROLE_USER')")
+					.antMatchers("/admin/**").access("hasRole('ROLE_ADMIN')")
+					//.anyRequest().permitAll()
+		.and()
+		.oauth2Login().userInfoEndpoint()
+        .userService(customOAuth2UserService)
+        .and()
+		.successHandler((request, response, authentication) -> {
+			String token = tokenProvider.create(authentication);
+			response.addHeader("Authorization", "Bearer " +  token);
+			String targetUrl = "/auth/success";
+			RequestDispatcher dis = request.getRequestDispatcher(targetUrl);
+			dis.forward(request, response);
+		})
+		.failureHandler(
+				(request, response, exception) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"));
+		return http.build();
+	}
+		
+	
+	@Bean
 	public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
 		return authenticationConfiguration.getAuthenticationManager();
+	}
+	
+	@Bean
+	public ClientRegistrationRepository clientRegistrationRepository(OAuth2ClientProperties clientProperties){
+		
+		List<ClientRegistration> registrations = 
+				clientProperties.getRegistration().keySet().stream()
+				.map(provider -> getRegistration(clientProperties, provider))
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+				
+		return new InMemoryClientRegistrationRepository(registrations);
+	}
+	
+	
+	private ClientRegistration getRegistration(OAuth2ClientProperties clientProperties, String provider) {
+		if("google".equals(provider)) {
+			OAuth2ClientProperties.Registration registration = clientProperties.getRegistration()
+					.get("google");
+			
+			return CommonOAuth2Provider.GOOGLE.getBuilder(provider)
+					.clientId(registration.getClientId())
+					.clientSecret(registration.getClientSecret())
+					.scope("email", "profile")
+					.build();
+		}
+		
+		if("facebook".equals(provider)) {
+			OAuth2ClientProperties.Registration registration = clientProperties.getRegistration()
+					.get("facebook");
+			
+			return CommonOAuth2Provider.FACEBOOK.getBuilder(provider)
+					.clientId(registration.getClientId())
+					.clientSecret(registration.getClientSecret())
+					.userInfoUri("https://graph.facebook.com/me?fields=id,name,email,link")
+					.scope("email")
+					.build();
+		}
+		return null;
+		
 	}
 	@Bean
 	public WebSecurityCustomizer webSecurityCustomizer() {
 		return (web) -> web.ignoring().antMatchers("/images/**", "/js/**", "/webjars/**");
 	}
-	@Bean
-	public BCryptPasswordEncoder encodePassword() {
-		return new BCryptPasswordEncoder();
-	}
-
-
 }
-
-
-
-
