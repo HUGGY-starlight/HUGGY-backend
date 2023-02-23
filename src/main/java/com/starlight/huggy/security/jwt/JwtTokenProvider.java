@@ -4,15 +4,18 @@ import com.starlight.huggy.security.UserPrincipal;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+
 @Service
 public class JwtTokenProvider {
-	public static final String tokenSecret = "926D96C90030DD58429D2751AC1BDBBC";
+	@Value("${custom.jwt.secret}")
+	public static final String tokenSecret = null;
 	public static final String tokenExpirationMsec = "86400000";
 
 	public String create(Authentication authentication) {
