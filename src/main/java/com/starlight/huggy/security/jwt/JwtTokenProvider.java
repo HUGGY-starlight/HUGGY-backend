@@ -15,7 +15,7 @@ import java.util.Date;
 @Service
 public class JwtTokenProvider {
 	@Value("${custom.jwt.secret}")
-	public static final String tokenSecret = null;
+	public String tokenSecret = null;
 	public static final String tokenExpirationMsec = "86400000";
 
 	public String create(Authentication authentication) {
