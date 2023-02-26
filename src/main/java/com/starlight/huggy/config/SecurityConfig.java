@@ -63,9 +63,9 @@ public class SecurityConfig {
         http.csrf().disable() //csrf 토큰
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
-                .addFilter(corsFilter) //@CrossOrgin(인증x) 시큐리티에 인증 등록
                 .formLogin().disable()//.loginPage("/login").loginProcessingUrl("/doLogin")
                 .httpBasic().disable()
+                .addFilter(corsFilter) //@CrossOrgin(인증x) 시큐리티에 인증 등록
 
                 .addFilter(new JwtBasicAuthenticationFilter())
                 .addFilter(new JwtCommonAuthorizationFilter(authenticationManager(http.getSharedObject(
