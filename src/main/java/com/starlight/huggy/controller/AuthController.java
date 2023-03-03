@@ -1,87 +1,65 @@
 package com.starlight.huggy.controller;
 
-import com.starlight.huggy.exception.BadRequestException;
-import com.starlight.huggy.model.AuthProvider;
-import com.starlight.huggy.model.Role;
-import com.starlight.huggy.model.User;
-import com.starlight.huggy.payload.ApiResponse;
-import com.starlight.huggy.payload.AuthResponse;
-import com.starlight.huggy.payload.LoginRequest;
-import com.starlight.huggy.payload.SignUpRequest;
-import com.starlight.huggy.repository.UserRepository;
-import com.starlight.huggy.security.jwt.JwtTokenProvider;
-import java.net.URI;
-import javax.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.starlight.huggy.domain.auth.SocialLoginType;
+import com.starlight.huggy.dto.DefaultResponse;
+import com.starlight.huggy.dto.auth.MemberInfoDto;
+import com.starlight.huggy.dto.auth.TokenResponseDto;
+import com.starlight.huggy.exception.AuthorityExceptionType;
+import com.starlight.huggy.exception.BizException;
+import com.starlight.huggy.exception.InternalServerExceptionType;
+import com.starlight.huggy.service.auth.GoogleService;
+import com.starlight.huggy.service.auth.KakaoService;
+import com.starlight.huggy.service.auth.SocialAuthService;
+import com.starlight.huggy.vo.ResponseMessage;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.bind.annotation.*;
 
-
-@Controller
-@RequestMapping("/api/v1/auth")
+@RestController
+@RequiredArgsConstructor
+@Slf4j
+@RequestMapping("/v1")
 public class AuthController {
+	private final GoogleService googleService;
+	private final KakaoService kakaoService;
 
-	@Autowired
-	private AuthenticationManager authenticationManager;
+	@PostMapping("/auth/{socialType}")
+	public ResponseEntity login(@RequestHeader(name = "auth-code", required = false) String authorizationCode, @PathVariable("socialType") String socialType){
+		try {
+			if(authorizationCode == null){
+				throw new BizException(AuthorityExceptionType.NO_AUTHORIZATION_CODE);
+			}
 
-	@Autowired
-	private UserRepository userRepository;
+			TokenResponseDto tokenResponse;
+			MemberInfoDto memberInfo;
+			SocialAuthService socialAuthService;
 
-	@Autowired
-	private PasswordEncoder passwordEncoder;
+			// api 경로 중 google, kakao, apple 여부 확인. 이외가 들어오면 exception
+			if(socialType.equals(SocialLoginType.KAKAO.getValue())){
+				socialAuthService = kakaoService;
+			}else if(socialType.equals(SocialLoginType.GOOGLE.getValue())){
+				socialAuthService = googleService;
+			}else{
+				throw new BizException(AuthorityExceptionType.INVALID_SOCIAL_TYPE);
+			}
 
-	@Autowired
-	private JwtTokenProvider tokenProvider;
+			tokenResponse = socialAuthService.getToken(authorizationCode);
+			memberInfo = socialAuthService.getMemberInfo(tokenResponse);
+			socialAuthService.signup(memberInfo);
 
-	@PostMapping("/signin")
-	public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-
-		Authentication authentication = authenticationManager.authenticate(
-				new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
-
-		SecurityContextHolder.getContext().setAuthentication(authentication);
-
-		String token = tokenProvider.create(authentication);
-		return ResponseEntity.ok(new AuthResponse(token));
-	}
-
-	@PostMapping("/signup")
-	public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
-		if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-			throw new BadRequestException("Email address already in use.");
+			log.info("로그인 : {} ({})", memberInfo.getEmail(), memberInfo.getName());
+			return new ResponseEntity<>(DefaultResponse.create(HttpStatus.OK.value(), ResponseMessage.LOGIN_SUCCESS, memberInfo), HttpStatus.OK);
 		}
-
-		// Creating user's account
-		User user = new User();
-		user.setName(signUpRequest.getName());
-		user.setEmail(signUpRequest.getEmail());
-		user.setPassword(signUpRequest.getPassword());
-		user.setProvider(AuthProvider.local);
-		user.setPassword(passwordEncoder.encode(user.getPassword()));
-		user.setRole(Role.valueOf("USER"));
-
-		User result = userRepository.save(user);
-
-		URI location = ServletUriComponentsBuilder.fromCurrentContextPath().path("/user/me")
-				.buildAndExpand(result.getId()).toUri();
-
-		return ResponseEntity.created(location).body(new ApiResponse(true, "User registered successfully@"));
+		catch (BizException e){
+			log.error(e.getMessage());
+			return new ResponseEntity<>(DefaultResponse.create(e.getBaseExceptionType().getHttpStatus().value(), e.getMessage()), e.getBaseExceptionType().getHttpStatus());
+		}
+		catch (Exception e){
+			log.error(e.getMessage());
+			return new ResponseEntity<>(DefaultResponse.create(HttpStatus.INTERNAL_SERVER_ERROR.value(), InternalServerExceptionType.INTERNAL_SERVER_ERROR.getMessage()), InternalServerExceptionType.INTERNAL_SERVER_ERROR.getHttpStatus());
+		}
 	}
-
-	@GetMapping("/success")
-	public ResponseEntity<?> signinSuccess() {
-		return ResponseEntity.ok(new ApiResponse(true, "JWT 발행 성공"));
-	}
-
 }
