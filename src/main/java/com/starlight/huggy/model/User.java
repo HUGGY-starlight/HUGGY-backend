@@ -1,52 +1,43 @@
 package com.starlight.huggy.model;
 
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.UniqueConstraint;
-import javax.validation.constraints.Email;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-
-@Data
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(columnNames = "email")
-})
 @Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
-    private String name;
-
-    @Email
-    @Column(nullable = false)
-    private String email;
-
-    private String imageUrl;
-
-    @Column(nullable = false)
-    private Boolean emailVerified = false;
-
-    @JsonIgnore
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private long id;
+    @Column(unique = true)
+    private String username;
     private String password;
+    private String email;
+    private String roles;
+    private String nickName;
 
-    @Enumerated(EnumType.STRING)
-    private Role role;
-    
-    @Enumerated(EnumType.STRING)
-    private AuthProvider provider;
-
+    private String provider; // google, kakao
     private String providerId;
 
-    // Getters and Setters (Omitted for brevity)
+
+    public List<String> getRoleList(){
+        if(this.roles.length() > 0){
+            return Arrays.asList(this.roles.split(","));
+        }
+        return new ArrayList<>();
+    }
 }
