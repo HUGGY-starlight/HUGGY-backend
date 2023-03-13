@@ -1,6 +1,5 @@
 package com.starlight.huggy.auth.controller;
 
-import com.starlight.huggy.auth.dto.TokenDto;
 import com.starlight.huggy.auth.exception.UserUnAuthorizedException;
 import com.starlight.huggy.common.dto.BasicMessageResponseDto;
 import com.starlight.huggy.security.jwt.JwtTokenProvider;
@@ -64,9 +63,9 @@ public class AuthApiController { //로그인, 토큰 업데이트
             userEntity = userService.register(user);
         }
 
-        String jwtToken = jwtTokenProvider.createToken(userEntity);
+        String jwtToken = jwtTokenProvider.create(userEntity);
         log.debug("Huggy 전용 JWT TOKEN: {}", jwtToken);
-        return ResponseEntity.ok().body(new BasicMessageResponseDto(jwtToken));
+        return ResponseEntity.ok().body(jwtToken);
     }
     @GetMapping("/auth/reissue") //토큰 재발급
     public ResponseEntity<?> reissue(@RequestHeader("Authorization") String refreshToken){

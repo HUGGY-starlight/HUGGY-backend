@@ -17,7 +17,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public User getUserByName(OAuthUserInfo user) {
         String userName = user.getProvider() + "_" + user.getProviderId();
-        return userRepository.findByUsername(userName).orElseThrow(() -> new AuthenticateException("Invalid user"));
+        return userRepository.findByUsername(userName).orElse(null);
     }
 
     @Override
