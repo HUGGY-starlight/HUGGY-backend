@@ -1,5 +1,6 @@
 package com.starlight.huggy.security.jwt;
 
+import com.starlight.huggy.auth.exception.AuthenticateException;
 import com.starlight.huggy.security.config.PrincipalDetails;
 import com.starlight.huggy.user.domain.User;
 import com.starlight.huggy.user.domain.UserRepository;
@@ -45,7 +46,7 @@ public class JwtAuthorizationFilter extends BasicAuthenticationFilter {
 		// 토큰 검증
 		String username = jwtTokenProvider.getUserName(token);
 		if (username != null) {
-			User user = userRepository.findByUsername(username);
+			User user = userRepository.findByUsername(username).orElseThrow(() -> new AuthenticateException("Invalid user."));
 
 			PrincipalDetails principalDetails = new PrincipalDetails(user);
 			Authentication authentication = new UsernamePasswordAuthenticationToken(principalDetails,
